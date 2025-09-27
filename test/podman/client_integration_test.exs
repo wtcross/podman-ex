@@ -115,6 +115,17 @@ defmodule Podman.ClientIntegrationTest do
       {:ok, _} =
         Podman.play_kube_down(client, manifest, force: true, content_type: "application/x-yaml")
 
+      down_result =
+        Podman.play_kube_down(client, manifest,
+          force: true,
+          content_type: "application/x-yaml"
+        )
+
+      case down_result do
+        {:ok, _} -> :ok
+        {:error, %Podman.Error{reason: reason}} -> assert reason == :server_error
+      end
+
       # Give Podman a moment to tear down resources
       Process.sleep(200)
 
