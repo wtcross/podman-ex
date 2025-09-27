@@ -284,9 +284,11 @@ defmodule Podman do
       {:ok, volume} ->
         {:ok, %{status: :created, volume: volume}}
 
-      {:error, %Podman.Error{reason: :conflict}} ->
+      {:error, %Podman.Error{status: status} = error} when status in [409, 500] ->
         with {:ok, info} <- inspect_volume(client, name, opts) do
           {:ok, %{status: :existing, volume: info}}
+        else
+          {:error, _} -> {:error, error}
         end
 
       {:error, error} ->

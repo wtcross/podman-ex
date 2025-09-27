@@ -5,7 +5,7 @@ defmodule Podman.Volumes do
 
   alias Podman.{Client, Error, RequestOptions}
 
-  @error_map %{404 => :not_found, 409 => :conflict}
+  @error_map %{404 => :not_found, 409 => :conflict, 500 => :server_error}
 
   @type volume_name :: String.t()
 
@@ -34,7 +34,7 @@ defmodule Podman.Volumes do
       |> Keyword.put(:json, spec)
 
     Client.post(client, ["libpod", "volumes", "create"], request_opts)
-    |> RequestOptions.classify(Map.merge(@error_map, %{500 => :server_error}))
+    |> RequestOptions.classify(@error_map)
   end
 
   @spec delete(Client.t(), volume_name(), keyword()) :: {:ok, term()} | {:error, Error.t()}

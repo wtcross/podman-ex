@@ -223,6 +223,40 @@ defmodule Podman.ClientIntegrationTest do
     end)
   end
 
+  test "orchestration helpers ensure resources", %{podman: podman, api_version: api_version} do
+    with_unix_service(podman, fn socket_path ->
+      base_url = "http+unix://#{URI.encode_www_form(socket_path)}/v#{api_version}/"
+      client = Podman.new(base_url: base_url)
+
+      # ensure network
+      network_name = "ensure-net-" <> unique_name("net")
+      assert {:ok, %{status: :created}} = Podman.ensure_network(client, network_name)
+      assert {:ok, %{status: :existing}} = Podman.ensure_network(client, network_name)
+
+      # ensure volume
+      volume_name = "ensure-vol-" <> unique_name("vol")
+      assert {:ok, %{status: :created}} = Podman.ensure_volume(client, volume_name)
+      assert {:ok, %{status: :existing}} = Podman.ensure_volume(client, volume_name)
+
+      # ensure pod started
+      pod_name = "ensure-pod-" <> unique_name("pod")
+      spec = %{"Name" => pod_name}
+
+      assert {:ok, %{status: :created}} = Podman.ensure_pod_started(client, spec)
+      assert {:ok, %{status: :existing}} = Podman.ensure_pod_started(client, spec)
+
+      # stop pod idempotently
+      assert {:ok, :stopped} = Podman.ensure_pod_stopped(client, pod_name)
+      assert {:ok, :already_stopped} = Podman.ensure_pod_stopped(client, pod_name)
+
+      # cleanup
+      {:ok, _} = Podman.ensure_pod_stopped(client, pod_name)
+      {:ok, _} = Podman.delete_pod(client, pod_name, force: true)
+      {:ok, _} = Podman.ensure_volume_deleted(client, volume_name)
+      {:ok, _} = Podman.ensure_network_deleted(client, network_name)
+    end)
+  end
+
   test "machine endpoints surface service errors", %{podman: podman, api_version: api_version} do
     with_unix_service(podman, fn socket_path ->
       base_url = "http+unix://#{URI.encode_www_form(socket_path)}/v#{api_version}/"
