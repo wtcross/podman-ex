@@ -47,6 +47,26 @@ defmodule Podman.IntegrationCase do
     prefix <> "-" <> suffix
   end
 
+  def with_container(podman, socket_path, name, create_args, fun) when is_function(fun, 1) do
+    url = "unix://#{socket_path}"
+    args = ["--url", url, "create", "--name", name] ++ create_args
+
+    case System.cmd(podman, args) do
+      {_, 0} ->
+        Process.sleep(200)
+
+        try do
+          fun.(url)
+        after
+          System.cmd(podman, ["--url", url, "rm", "-f", name])
+          Process.sleep(200)
+        end
+
+      {stderr, status} ->
+        raise "failed to create container #{name}: #{inspect({status, stderr})}"
+    end
+  end
+
   defp socket_path do
     Path.join(System.tmp_dir!(), "podman-client-test-#{unique_name("socket")}.sock")
   end

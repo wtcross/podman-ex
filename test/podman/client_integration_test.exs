@@ -159,37 +159,28 @@ defmodule Podman.ClientIntegrationTest do
       assert Map.get(inspected, "name") == network_name
 
       container = "demo-container-" <> unique_name("ctr")
-      url = "unix://#{socket_path}"
 
-      try do
-        assert {_, 0} =
-                 System.cmd(podman, [
-                   "--url",
-                   url,
-                   "create",
-                   "--name",
-                   container,
-                   "--network",
-                   "none",
-                   "docker.io/library/alpine:3",
-                   "sleep",
-                   "30"
-                 ])
+      with_container(
+        podman,
+        socket_path,
+        container,
+        ["--network", "none", "docker.io/library/alpine:3", "sleep", "30"],
+        fn _url ->
+          connect_result =
+            Podman.network_connect(client, network_name, %{"container" => container})
 
-        connect_result =
-          Podman.network_connect(client, network_name, %{"container" => container})
+          case connect_result do
+            {:ok, %{}} ->
+              assert {:ok, %{}} =
+                       Podman.network_disconnect(client, network_name, %{"container" => container})
 
-        case connect_result do
-          {:ok, %{}} ->
-            assert {:ok, %{}} =
-                     Podman.network_disconnect(client, network_name, %{"container" => container})
+            {:error, %Podman.Error{reason: reason}} ->
+              assert reason in [:server_error, :not_found]
+          end
 
-          {:error, %Podman.Error{reason: reason}} ->
-            assert reason in [:server_error, :not_found]
+          Process.sleep(200)
         end
-      after
-        System.cmd(podman, ["--url", url, "rm", "-f", container])
-      end
+      )
 
       {:ok, _} = Podman.delete_network(client, network_name, force: true)
     end)
