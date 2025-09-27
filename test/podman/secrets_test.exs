@@ -1,7 +1,7 @@
 defmodule Podman.SecretsTest do
   use ExUnit.Case, async: true
 
-  alias Podman.{Client, Secrets}
+  alias Podman.{Client, Error, Secrets}
 
   setup do
     bypass = Bypass.open()
@@ -40,6 +40,22 @@ defmodule Podman.SecretsTest do
     end)
 
     assert {:ok, :ok} = Secrets.delete(client, "demo", all: true)
+  end
+
+  test "delete classifies not found", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/secrets/missing", fn conn ->
+      Plug.Conn.resp(conn, 404, ~s({"message":"missing"}))
+    end)
+
+    assert {:error, %Error{reason: :not_found}} = Secrets.delete(client, "missing")
+  end
+
+  test "create classifies server error", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/secrets/create", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"boom"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Secrets.create(client, "demo", "data")
   end
 
   test "exists? handles 404", %{bypass: bypass, client: client} do

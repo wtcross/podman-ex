@@ -36,7 +36,7 @@ defmodule Podman.RequestOptionsTest do
     end
 
     test "encode_map handles keyword lists" do
-      assert RequestOptions.encode_map([a: 1, b: 2]) == ~s({"a":1,"b":2})
+      assert RequestOptions.encode_map(a: 1, b: 2) == ~s({"a":1,"b":2})
     end
 
     test "encode_map handles atoms" do
@@ -47,6 +47,7 @@ defmodule Podman.RequestOptionsTest do
   describe "classify/2" do
     test "returns classified error" do
       error = %Error{status: 404}
+
       assert {:error, %Error{reason: :not_found}} =
                RequestOptions.classify({:error, error}, %{404 => :not_found})
     end

@@ -84,6 +84,22 @@ defmodule Podman.PodsTest do
     assert {:ok, %{} = _} = Pods.delete(client, "demo", force: true)
   end
 
+  test "delete classifies server errors", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/pods/fail", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"boom"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Pods.delete(client, "fail")
+  end
+
+  test "stop classifies bad request", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/pods/demo/stop", fn conn ->
+      Plug.Conn.resp(conn, 400, ~s({"message":"bad"}))
+    end)
+
+    assert {:error, %Error{reason: :bad_request}} = Pods.stop(client, "demo")
+  end
+
   test "exists? handles 204 and 404", %{bypass: bypass, client: client} do
     Bypass.expect_once(bypass, "GET", "/v5.0.0/libpod/pods/demo/exists", fn conn ->
       Plug.Conn.resp(conn, 204, "")

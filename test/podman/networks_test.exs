@@ -41,6 +41,14 @@ defmodule Podman.NetworksTest do
     assert {:ok, %{"Id" => "abc"}} = Networks.create(client, payload)
   end
 
+  test "create classifies server errors", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/networks/create", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"boom"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Networks.create(client, %{})
+  end
+
   test "delete forwards force param", %{bypass: bypass, client: client} do
     Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/networks/demo", fn conn ->
       conn = Plug.Conn.fetch_query_params(conn)
@@ -62,6 +70,14 @@ defmodule Podman.NetworksTest do
     assert {:error, %Error{reason: :not_found}} = Networks.delete(client, "missing")
   end
 
+  test "delete classifies server errors", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/networks/fail", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"boom"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Networks.delete(client, "fail")
+  end
+
   test "connect sends json body", %{bypass: bypass, client: client} do
     attrs = %{"Container" => "ctr"}
 
@@ -75,6 +91,14 @@ defmodule Podman.NetworksTest do
     end)
 
     assert {:ok, %{}} = Networks.connect(client, "demo", attrs)
+  end
+
+  test "connect classifies server errors", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/networks/demo/connect", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"boom"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Networks.connect(client, "demo", %{})
   end
 
   test "disconnect classifies errors", %{bypass: bypass, client: client} do

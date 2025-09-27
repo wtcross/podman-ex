@@ -41,6 +41,14 @@ defmodule Podman.VolumesTest do
     assert {:ok, %{"Name" => "demo"}} = Volumes.create(client, spec)
   end
 
+  test "create classifies server errors", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/volumes/create", fn conn ->
+      Plug.Conn.resp(conn, 500, ~s({"message":"fail"}))
+    end)
+
+    assert {:error, %Error{reason: :server_error}} = Volumes.create(client, %{})
+  end
+
   test "delete forwards force", %{bypass: bypass, client: client} do
     Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/volumes/demo", fn conn ->
       conn = Plug.Conn.fetch_query_params(conn)
