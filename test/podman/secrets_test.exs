@@ -29,6 +29,28 @@ defmodule Podman.SecretsTest do
              Secrets.create(client, "demo", "secret", labels: %{app: "demo"})
   end
 
+  test "create encodes driver options", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/secrets/create", fn conn ->
+      conn = Plug.Conn.fetch_query_params(conn)
+      assert conn.params["name"] == "demo"
+      assert conn.params["driver"] == "file"
+      assert conn.params["driveropts"] |> Jason.decode!() == %{"opt" => "value"}
+
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body == Base.encode64("payload")
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(201, ~s({"ID":"xyz"}))
+    end)
+
+    assert {:ok, %{"ID" => "xyz"}} =
+             Secrets.create(client, "demo", "payload",
+               driver: "file",
+               driver_opts: %{opt: "value"}
+             )
+  end
+
   test "delete forwards all param", %{bypass: bypass, client: client} do
     Bypass.expect(bypass, "DELETE", "/v5.0.0/libpod/secrets/demo", fn conn ->
       conn = Plug.Conn.fetch_query_params(conn)
