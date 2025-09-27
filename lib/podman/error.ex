@@ -97,4 +97,19 @@ defmodule Podman.Error do
       trimmed -> String.slice(trimmed, 0, 200) <> "…"
     end
   end
+
+  @doc false
+  @spec with_reason(t(), atom()) :: t()
+  def with_reason(%__MODULE__{} = error, reason) when is_atom(reason) do
+    %{error | reason: reason}
+  end
+
+  @doc false
+  @spec classify(t(), %{optional(integer()) => atom()}) :: t()
+  def classify(%__MODULE__{} = error, mapping) when is_map(mapping) do
+    case Map.get(mapping, error.status) do
+      nil -> error
+      reason -> with_reason(error, reason)
+    end
+  end
 end

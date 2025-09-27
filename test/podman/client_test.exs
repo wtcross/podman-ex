@@ -123,4 +123,33 @@ defmodule Podman.ClientTest do
     assert Keyword.get(connect_options, :transport_opts)[:verify] == :verify_peer
     assert Keyword.get(connect_options, :transport_opts)[:cacertfile] == "/tmp/certs/ca.pem"
   end
+
+  test "injects registry auth header" do
+    bypass = Bypass.open()
+    base_url = "http://localhost:#{bypass.port}/v5.0.0/"
+    client = Client.new(base_url: base_url)
+
+    auth = %{username: "user", password: "pass"}
+
+    Bypass.expect(bypass, "POST", "/v5.0.0/libpod/images/pull", fn conn ->
+      assert [header] = Plug.Conn.get_req_header(conn, "x-registry-auth")
+
+      decoded =
+        header
+        |> Base.decode64!()
+        |> Jason.decode!()
+
+      assert decoded == %{"username" => "user", "password" => "pass"}
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(200, ~s({}))
+    end)
+
+    assert {:ok, %{}} =
+             Client.post(client, ["libpod", "images", "pull"],
+               registry_auth: auth,
+               json: %{}
+             )
+  end
 end

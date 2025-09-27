@@ -41,8 +41,6 @@ defmodule Podman.Images do
       ])
       |> Map.put("reference", reference)
 
-    registry_auth = Keyword.get(opts, :registry_auth)
-
     request_opts =
       opts
       |> Keyword.drop([
@@ -53,12 +51,10 @@ defmodule Podman.Images do
         :variant,
         :policy,
         :tls_verify,
-        :all_tags,
-        :registry_auth
+        :all_tags
       ])
       |> Keyword.delete(:params)
       |> Keyword.put(:params, params)
-      |> maybe_put_header("X-Registry-Auth", registry_auth)
 
     Client.post(client, ["libpod", "images", "pull"], request_opts)
   end
@@ -72,20 +68,4 @@ defmodule Podman.Images do
 
   defp maybe_put(keyword_list, _key, params) when params == %{}, do: keyword_list
   defp maybe_put(keyword_list, key, params), do: Keyword.put(keyword_list, key, params)
-
-  defp maybe_put_header(opts, _header, nil), do: opts
-
-  defp maybe_put_header(opts, header, value) do
-    headers =
-      opts
-      |> Keyword.get(:headers, [])
-      |> Enum.reject(fn {name, _} ->
-        String.downcase(to_string(name)) == String.downcase(header)
-      end)
-      |> List.insert_at(0, {header, value})
-
-    opts
-    |> Keyword.delete(:headers)
-    |> Keyword.put(:headers, headers)
-  end
 end

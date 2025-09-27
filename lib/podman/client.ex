@@ -149,7 +149,13 @@ defmodule Podman.Client do
     normalized_path = normalize_path(path)
     response_mode = Keyword.get(opts, :response, :body)
 
-    sanitized_opts = Keyword.delete(opts, :response)
+    registry_auth = Keyword.get(opts, :registry_auth)
+
+    sanitized_opts =
+      opts
+      |> Keyword.delete(:response)
+      |> Keyword.delete(:registry_auth)
+      |> apply_registry_auth(registry_auth)
 
     request_opts =
       sanitized_opts
@@ -289,6 +295,43 @@ defmodule Podman.Client do
       {:ok, value} when value not in [nil, ""] -> Map.put(acc, query_key, mapper.(value))
       _ -> acc
     end
+  end
+
+  defp apply_registry_auth(opts, nil), do: opts
+
+  defp apply_registry_auth(opts, auth) do
+    header_value = encode_registry_auth(auth)
+
+    headers =
+      opts
+      |> Keyword.get(:headers, [])
+      |> List.wrap()
+      |> Enum.reject(fn {name, _} ->
+        String.downcase(to_string(name)) == "x-registry-auth"
+      end)
+      |> List.insert_at(0, {"X-Registry-Auth", header_value})
+
+    opts
+    |> Keyword.delete(:headers)
+    |> Keyword.put(:headers, headers)
+  end
+
+  defp encode_registry_auth(auth) when is_binary(auth), do: auth
+
+  defp encode_registry_auth(auth) when is_list(auth) do
+    if Keyword.keyword?(auth) do
+      auth
+      |> Enum.into(%{})
+      |> encode_registry_auth()
+    else
+      auth |> Enum.map(&to_string/1) |> Enum.join() |> encode_registry_auth()
+    end
+  end
+
+  defp encode_registry_auth(%{} = auth) do
+    auth
+    |> Jason.encode!()
+    |> Base.encode64()
   end
 
   defp normalize_connection(nil, ssh_runner, opts) do
